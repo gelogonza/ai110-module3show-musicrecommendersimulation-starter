@@ -17,17 +17,28 @@ Replace this paragraph with your own summary of what your version does.
 
 ## How The System Works
 
-Explain your design in plain language.
-
-Some prompts to answer:
-
 - What features does each `Song` use in your system
-  - For example: genre, mood, energy, tempo
-- What information does your `UserProfile` store
-- How does your `Recommender` compute a score for each song
-- How do you choose which songs to recommend
+  - `mood` — categorical, the emotional intent of the track (e.g. chill, happy, intense)
+  - `genre` — categorical, broad stylistic grouping (e.g. lofi, rock, jazz)
+  - `energy` — numeric 0–1, how intense or driving the track feels
+  - `valence` — numeric 0–1, emotional positivity/negativity of the track
 
-You can include a simple diagram or bullet list if helpful.
+- What information does your `UserProfile` store
+  - preferred `mood` and `genre` (categorical)
+  - preferred `energy` and `valence` levels (numeric, 0–1)
+
+- How does your `Recommender` compute a score for each song
+  - categorical features (mood, genre): binary match — 1 if it matches the user's preference, 0 if not
+  - numeric features (energy, valence): Gaussian proximity scoring — score is 1.0 at exact match and decays smoothly as the gap grows (σ = 0.20)
+  - final score = weighted sum: mood (0.35) + genre (0.25) + energy (0.25) + valence (0.15)
+  - mood and genre outweigh numerics because the same mood can be expressed across different energy levels
+
+- How do you choose which songs to recommend
+  - score every song in the catalog against the user profile
+  - rank by final score descending
+  - return the top N results
+
+
 
 ---
 

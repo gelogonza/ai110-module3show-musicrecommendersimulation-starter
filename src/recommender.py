@@ -50,15 +50,93 @@ def load_songs(csv_path: str) -> List[Dict]:
     Loads songs from a CSV file.
     Required by src/main.py
     """
-    # TODO: Implement CSV loading logic
-    print(f"Loading songs from {csv_path}...")
-    return []
+    import csv
+
+    int_fields = {"id", "tempo_bpm"}
+    float_fields = {"energy", "valence", "danceability", "acousticness"}
+
+    songs = []
+    with open(csv_path, newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            for field in int_fields:
+                row[field] = int(row[field])
+            for field in float_fields:
+                row[field] = float(row[field])
+            songs.append(row)
+    return songs
+
+def score_song(song: Dict, user_prefs: Dict) -> Tuple[int, List[str]]:
+    """
+    Score a single song against user preferences using the 12-point system.
+
+    Points breakdown (max 12):
+      Mood  (categorical) — +4 for exact match
+      Genre (categorical) — +3 for exact match
+      Energy (numeric)    — +3 / +2 / +1 / +0 by proximity tier
+      Valence (numeric)   — +2 / +1 / +0 by proximity tier
+
+    Returns
+    -------
+    score   : int in [0, 12]
+    reasons : list of human-readable strings explaining each component
+    """
+    score = 0
+    reasons: List[str] = []
+
+    # --- Mood (max 4 pts) ---
+    if song["mood"] == user_prefs["mood"]:
+        score += 4
+        reasons.append(f"mood match '{song['mood']}' (+4)")
+    else:
+        reasons.append(f"mood '{song['mood']}' != '{user_prefs['mood']}' (+0)")
+
+    # --- Genre (max 3 pts) ---
+    if song["genre"] == user_prefs["genre"]:
+        score += 3
+        reasons.append(f"genre match '{song['genre']}' (+3)")
+    else:
+        reasons.append(f"genre '{song['genre']}' != '{user_prefs['genre']}' (+0)")
+
+    # --- Energy (max 3 pts) ---
+    delta_energy = abs(song["energy"] - user_prefs["energy"])
+    if delta_energy <= 0.10:
+        score += 3
+        reasons.append(f"energy Δ{delta_energy:.2f} ≤ 0.10 (+3)")
+    elif delta_energy <= 0.20:
+        score += 2
+        reasons.append(f"energy Δ{delta_energy:.2f} ≤ 0.20 (+2)")
+    elif delta_energy <= 0.35:
+        score += 1
+        reasons.append(f"energy Δ{delta_energy:.2f} ≤ 0.35 (+1)")
+    else:
+        reasons.append(f"energy Δ{delta_energy:.2f} > 0.35 (+0)")
+
+    # --- Valence (max 2 pts) ---
+    delta_valence = abs(song["valence"] - user_prefs["valence"])
+    if delta_valence <= 0.10:
+        score += 2
+        reasons.append(f"valence Δ{delta_valence:.2f} ≤ 0.10 (+2)")
+    elif delta_valence <= 0.25:
+        score += 1
+        reasons.append(f"valence Δ{delta_valence:.2f} ≤ 0.25 (+1)")
+    else:
+        reasons.append(f"valence Δ{delta_valence:.2f} > 0.25 (+0)")
+
+    return score, reasons
+
 
 def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
     """
     Functional implementation of the recommendation logic.
     Required by src/main.py
+
+    Judges every song in the catalog with score_song, then uses sorted()
+    to rank the full list and slices the top k results.
     """
-    # TODO: Implement scoring and ranking logic
-    # Expected return format: (song_dict, score, explanation)
-    return []
+    results = []
+    for song in songs:
+        score, reasons = score_song(song, user_prefs)
+        results.append((song, score, "; ".join(reasons)))
+
+    return sorted(results, key=lambda item: item[1], reverse=True)[:k]

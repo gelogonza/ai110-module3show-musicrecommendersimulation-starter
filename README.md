@@ -42,6 +42,83 @@ Replace this paragraph with your own summary of what your version does.
 
 ---
 
+## Point Weighting Strategy
+
+Each song is scored out of **12 points** against the user profile. The weights mirror the README's proportions (mood 35%, genre 25%, energy 25%, valence 15%) expressed as whole-number points.
+
+| Feature | Match condition | Points |
+|---------|----------------|--------|
+| **Mood** (categorical) | exact string match | +4 |
+| **Genre** (categorical) | exact string match | +3 |
+| **Energy** (numeric) | \|song − target\| ≤ 0.10 | +3 |
+| | \|song − target\| ≤ 0.20 | +2 |
+| | \|song − target\| ≤ 0.35 | +1 |
+| | \|song − target\| > 0.35 | +0 |
+| **Valence** (numeric) | \|song − target\| ≤ 0.10 | +2 |
+| | \|song − target\| ≤ 0.25 | +1 |
+| | \|song − target\| > 0.25 | +0 |
+
+The energy and valence tiers are sized around σ = 0.20 from the Gaussian formula — within one σ earns full numeric points, within two σ earns partial, beyond that earns nothing.
+
+### Expected Biases
+
+- **Categorical lock-in** — mood and genre together control 7 of 12 points. A song that is a near-perfect numeric fit but the wrong genre/mood can never outscore a genre+mood match, even a bad one. The system will always cluster around the user's stated labels.
+- **Lofi/chill dominance** — the catalog has three lofi songs and two of them are tagged `chill`. Any profile that matches this pair will saturate the top two slots every time, leaving little room for variety.
+- **Genre string fragility** — matching is exact. `"indie pop"` does not match `"pop"`, so closely related genres are treated as completely different. A user who likes pop may never see indie pop results.
+- **Numeric proximity to "average" scores well** — songs with mid-range energy and valence (≈ 0.5) earn partial numeric points against almost any profile, which can lift stylistically irrelevant tracks above more fitting ones that happen to have extreme values.
+- **Single fixed profile** — the system assumes one static taste at query time. A user whose mood shifts (study session vs. workout) gets the same recommendations regardless.
+
+### Predicted Top 5 (profile: lofi / chill / energy 0.38 / valence 0.58)
+
+| Rank | Song | Score | Why |
+|------|------|-------|-----|
+| 1 | Library Rain | 12/12 | genre + mood match, Δenergy 0.03, Δvalence 0.02 |
+| 2 | Midnight Coding | 12/12 | genre + mood match, Δenergy 0.04, Δvalence 0.02 |
+| 3 | Spacewalk Thoughts | 9/12 | mood match only, Δenergy 0.10, Δvalence 0.07 |
+| 4 | Focus Flow | 8/12 | genre match only, Δenergy 0.02, Δvalence 0.01 |
+| 5 | Coffee Shop Stories | 4/12 | no categorical match, Δenergy 0.01 (very close), Δvalence 0.13 |
+
+---
+
+## Data Flow
+
+```mermaid
+flowchart TD
+    A["songs.csv\n15 rows · 10 columns"] -->|load_songs| B["Parse CSV\nEach row → Python dict"]
+    B --> C["Select one Song dict\ne.g. Library Rain"]
+
+    subgraph SCORE ["score_song(song, user_prefs)  ·  max 12 pts"]
+        C --> D["Extract 4 features\ngenre · mood · energy · valence"]
+
+        D --> E{"genre ==\nuser genre?"}
+        E -->|yes| F["+3 pts"]
+        E -->|no|  G["+0 pts"]
+
+        F & G --> H{"mood ==\nuser mood?"}
+        H -->|yes| I["+4 pts"]
+        H -->|no|  J["+0 pts"]
+
+        I & J --> K["Δenergy = |song.energy − target|"]
+        K -->|"Δ ≤ 0.10"|         L["+3 pts"]
+        K -->|"0.10 < Δ ≤ 0.20"| M["+2 pts"]
+        K -->|"0.20 < Δ ≤ 0.35"| N["+1 pt"]
+        K -->|"Δ > 0.35"|         O["+0 pts"]
+
+        L & M & N & O --> P["Δvalence = |song.valence − target|"]
+        P -->|"Δ ≤ 0.10"|         Q["+2 pts"]
+        P -->|"0.10 < Δ ≤ 0.25"| R["+1 pt"]
+        P -->|"Δ > 0.25"|         S["+0 pts"]
+
+        Q & R & S --> T["Sum all points\n(0 – 12)"]
+    end
+
+    T --> U["Repeat for all\nremaining songs"]
+    U --> V["Sort by score\ndescending"]
+    V --> W["Return top N\n(song dict, score, explanation)"]
+```
+
+---
+
 ## Getting Started
 
 ### Setup

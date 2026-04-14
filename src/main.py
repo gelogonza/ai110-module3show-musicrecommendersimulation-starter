@@ -1,38 +1,55 @@
 """
 Command line runner for the Music Recommender Simulation.
-
-This file helps you quickly run and test your recommender.
-
-You will implement the functions in recommender.py:
-- load_songs
-- score_song
-- recommend_songs
 """
 
 from recommender import load_songs, recommend_songs
 
+SEPARATOR = "-" * 60
+
+
+def show_recommendations(label: str, user_prefs: dict, songs: list, k: int = 5) -> None:
+    print(f"\n{'=' * 60}")
+    print(f"  Profile: {label}")
+    print(f"{'=' * 60}")
+
+    recommendations = recommend_songs(user_prefs, songs, k=k)
+
+    for rank, (song, score, explanation) in enumerate(recommendations, start=1):
+        print(f"\n  #{rank}  {song['title']:<35} {score:>2.0f} / 12")
+        print(f"       {SEPARATOR}")
+        for reason in explanation.split("; "):
+            print(f"       {reason}")
+
 
 def main() -> None:
-    songs = load_songs("data/songs.csv") 
+    songs = load_songs("data/songs.csv")
+    print(f"Loaded {len(songs)} songs.")
 
-    # Taste profile: late-night lofi listener who prefers calm, mid-valence tracks
-    user_prefs = {
-        "genre": "lofi",
-        "mood": "chill",
-        "energy": 0.38,   # low-energy, relaxed listening
-        "valence": 0.58,  # mildly positive — not euphoric, not sad
-    }
+    profiles = [
+        {
+            "label": "lofi / chill  |  energy 0.38  |  valence 0.58",
+            "prefs": {
+                "genre": "lofi",
+                "mood":  "chill",
+                "energy":  0.38,
+                "valence": 0.58,
+            },
+        },
+        {
+            "label": "pop / happy  |  energy 0.80  |  valence 0.82",
+            "prefs": {
+                "genre": "pop",
+                "mood":  "happy",
+                "energy":  0.80,
+                "valence": 0.82,
+            },
+        },
+    ]
 
-    recommendations = recommend_songs(user_prefs, songs, k=5)
+    for profile in profiles:
+        show_recommendations(profile["label"], profile["prefs"], songs)
 
-    print("\nTop recommendations:\n")
-    for rec in recommendations:
-        # You decide the structure of each returned item.
-        # A common pattern is: (song, score, explanation)
-        song, score, explanation = rec
-        print(f"{song['title']} - Score: {score:.2f}")
-        print(f"Because: {explanation}")
-        print()
+    print()
 
 
 if __name__ == "__main__":
